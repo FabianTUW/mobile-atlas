@@ -2,6 +2,7 @@
 """
 SIM Provider Main
 """
+import hashlib
 import logging
 from mobileatlas.simprovider.device_observer import DeviceEvent, DeviceObserver
 from pySim.transport.serial import SerialSimLink
@@ -56,10 +57,11 @@ class SimProvider(DeviceEvent):
                 sl = PcscSimLink(device.index)
             sim = SimProvider.query_sim_info(device_name, sl)
             self.sims.append(sim)
-        except:
-            pass
+        except Exception as e:
+            logging.warn(f"prepare sim interface error {repr(e)}")
 
     def get_sims(self):
+        logging.info(f"get sims {list(map(lambda x: (x.device_name,x.imsi), self.sims))}")
         return self.sims
 
     @staticmethod
@@ -71,35 +73,57 @@ class SimProvider(DeviceEvent):
         if not is_connected:
             sl.connect()
 
-        # Create command layer
-        scc = SimCardCommands(transport=sl)
+        def do_sim():
+                # Create command layer
+            scc = SimCardCommands(transport=sl)
 
-        # TODO: add check that it is an actual sim card?
-        sim_card = SimCard(scc) #Card(scc)
+            # TODO: add check that it is an actual sim card?
+            sim_card = SimCard(scc) #Card(scc)
 
-        # query iccid
-        iccid, sw = sim_card.read_iccid()
-        if not iccid or sw != '9000':
-            logging.debug(f"Error querying iccid ({iccid}, {sw})")
-            return None
+            # query iccid
+            iccid, sw = sim_card.read_iccid()
+            if not iccid or sw != '9000':
+                logging.debug(f"Error querying iccid ({iccid}, {sw})")
+                return None
 
-        # query imsi
-        imsi, sw = sim_card.read_imsi()
-        if not imsi:
-            logging.debug(f"Error querying imsi ({imsi}, {sw})")
-            return None
-        #imsi = "123456789101112"
+            # query imsi
+            imsi, sw = sim_card.read_imsi()
+            if not imsi:
+                logging.debug(f"Error querying imsi ({imsi}, {sw})")
+                return None
 
-        sim_info = SimInfo(iccid, imsi, device_name, sl.get_atr(), sl)
+            sim_info = SimInfo(iccid, imsi, device_name, sl.get_atr(), sl)
 
-        # bring back into disconnected state
-        if not is_connected:
-             sl.disconnect()
+            # bring back into disconnected state
+            if not is_connected:
+                sl.disconnect()
 
-        logging.info(f"device {sim_info.device_name} --> has imsi {sim_info.imsi}, iccid {sim_info.iccid}, and atr {sim_info.atr}")
+            logging.info(f"device {sim_info.device_name} --> has imsi {sim_info.imsi}, iccid {sim_info.iccid}, and atr {sim_info.atr}")
 
-        return sim_info
-
+            return sim_info
+        
+        def do_scard_t1():
+            # In some T1 cards iccid, imsi are not available
+            # -> use hashed reader name
+            #cn = 'Generic Smart Card Reader Interface [Smart Card Reader Interface] (20070818000000000) 00 00'
+            
+            reader_name = str(sl._con.component.reader)
+            canonical_name = reader_name[:-5]
+            imsi = abs(int(hashlib.md5(canonical_name.encode()).hexdigest(), 16)) % (2**64)
+            return SimInfo(None, imsi, device_name, sl.get_atr(), sl)
+        
+        """ https://github.com/LudovicRousseau/pyscard/blob/master/smartcard/CardConnection.py#L150
+            defaultprotocol: a bit mask of L{CardConnection.T0_protocol},
+                L{CardConnection.T1_protocol}, L{CardConnection.RAW_protocol},
+                L{CardConnection.T15_protocol}
+                Example:
+                0010 = 2 -> T1
+                0011 = 3 -> T0,T1
+        """
+        logging.info(f"device name {device_name}")
+        if sl._con.component.defaultprotocol % 4 == 2:
+            return do_scard_t1()
+        return do_sim()
 
 
 def main():

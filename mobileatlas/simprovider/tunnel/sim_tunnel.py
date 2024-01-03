@@ -4,6 +4,9 @@ import logging
 from pySim.transport import LinkBase
 from pySim.utils import b2h, h2b
 
+class APDUMessageException(Exception):
+    pass
+
 class SimTunnel(threading.Thread):
     """
     Connect a SimLink with a TCP Connection
@@ -21,6 +24,11 @@ class SimTunnel(threading.Thread):
     def run(self):
         self.sl.connect()
         self.connected = True
+        atr = self.sl.get_atr()
+        if self.direct_connection:
+            self.connection.send(atr)
+        else:
+            self.connection.write_all(atr)
         self.maintain_connection()
 
     def maintain_connection(self):
@@ -30,20 +38,19 @@ class SimTunnel(threading.Thread):
         try:
             while self.connected:
                 self.process_packet()
+        except APDUMessageException as e:
+            logging.info(e)
         except Exception as e:
-            logging.fatal(e, exc_info=True)
+            logging.fatal(e, exc_info=False)
         finally:
-            # Clean up the connection
-            # logging.info("serial buffer: " + str(bin2hex(self.sl.rx_bytes())))
-            # self.sl.disconnect()
             logging.info("close connection")
             self.sl.disconnect()
             try:
-                self.connection.unwrap()
+                _con = self.connection.unwrap()
+                _con.shutdown(socket.SHUT_RDWR)
+                _con.close()
             except:
-                pass
-            self.connection.shutdown(socket.SHUT_RDWR)
-            self.connection.close()
+                self.connection.close()
 
     def process_packet_indirect(self):
         apdu = self.connection.recv()
@@ -65,8 +72,7 @@ class SimTunnel(threading.Thread):
 
         if(len(apdu) < 5):
             self.connected = False
-            logging.info("not enough bytes received -> disconnect")
-            return
+            raise APDUMessageException(f"not enough bytes received: {apdu}")
 
         logging.info(f"received apdu[{len(apdu)}]: {b2h(apdu)}")
         data, sw = self.sl.send_apdu(b2h(apdu))

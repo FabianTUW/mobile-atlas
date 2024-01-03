@@ -63,7 +63,7 @@ def direct_connection(host, port, sim_provider, tls_ctx):
         # First 8 Byte is the IMSI
         requested_imsi = struct.unpack('!Q', connection.recv(8))[0]
 
-        device = next((x for x in sim_provider.get_sims() if x.imsi == str(requested_imsi)), None)
+        device = next((x for x in sim_provider.get_sims() if x.imsi == requested_imsi), None)
         if device:
             logging.info(f"requested imsi {requested_imsi} is on device {device.device_name}")
             # Start SimTunnel for connection to serial device

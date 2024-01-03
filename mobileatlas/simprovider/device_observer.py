@@ -69,6 +69,14 @@ class SerialObserver(Observer):
                     self.devices_permission_warning.append(device)
                     logging.warning(f"Device {device} has unsufficient permissions")
 
+            for i,r in enumerate(readers()):
+                r.index = i
+                if r in self.current_devices:
+                    current.remove(r)
+                else:
+                    self.notify_add(DeviceEvent.DEVICE_TYPE_SCARD, r)
+                    self.current_devices.append(r)
+
             # devices that remain in current were removed
             for removed in current:
                 self.current_devices.remove(removed)
