@@ -121,7 +121,7 @@ class SimProvider(DeviceEvent):
                 0011 = 3 -> T0,T1
         """
         logging.info(f"device name {device_name}")
-        if sl._con.component.defaultprotocol % 4 == 2:
+        if hasattr(sl, '_con') and sl._con.component.defaultprotocol % 4 == 2:
             return do_scard_t1()
         return do_sim()
 
