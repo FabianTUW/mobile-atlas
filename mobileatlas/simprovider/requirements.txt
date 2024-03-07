@@ -1,7 +1,7 @@
 # Tested with Python 3.9.2
 
 # Forked PySim:
--e git+https://github.com/GGegenhuber/pysim.git@7100095f31105a5b5aa3c7ed32a005bc568ad5ec#egg=pySim
+-e git+https://github.com/GGegenhuber/pysim.git@ef2eb880e8a5b3d2b0ef5278531d727b7ff68b9b#egg=pySim
 
 moatt-clients @ git+https://github.com/sbaresearch/mobile-atlas-tunnel@main#subdirectory=src/moatt_clients
 moatt-types @ git+https://github.com/sbaresearch/mobile-atlas-tunnel@main#subdirectory=src/moatt_types

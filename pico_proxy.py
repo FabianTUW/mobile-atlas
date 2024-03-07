@@ -51,12 +51,12 @@ def wait_for_pico() -> serial.Serial:
 def relay_with_pico(imsi, connection: ssl.SSLSocket, delay_relay=False):
     # TODO Consider outer while loop
     connection.send(struct.pack("!Q", imsi))
-    _atr = None
-    while _atr is None or len(_atr) == 0:
-        _atr = connection.recv(33)  # ATR max length
-    atr = _atr
+    atr = None
+    while atr is None or len(atr) == 0:
+        atr = connection.recv(33)  # ATR max length
+
     s = wait_for_pico()
-    logging.info("pico connected")
+    logging.info(f"pico connected, ATR {toHexString(list(atr))}")
     pico_measurements = []
     probe_measurements = []
 
@@ -84,7 +84,6 @@ def relay_with_pico(imsi, connection: ssl.SSLSocket, delay_relay=False):
             end_probe = time.perf_counter_ns()
 
             buf = struct.pack("=BI", OP_APDU, len(resp))
-            logging.info(f"Forwarding header {buf} (len {len(resp)})")
             s.write(buf)
             s.write(resp)
             probe_measurements.append(
@@ -92,8 +91,10 @@ def relay_with_pico(imsi, connection: ssl.SSLSocket, delay_relay=False):
                     (end_probe - start_probe) // 1000,
                     toHexString(list(data)),
                     toHexString(list(resp)),
+                    datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
                 )
             )
+            logging.info(f"Forwarding header {buf} (len {len(resp)})")
             logging.info(f"Forwarding response {len(resp)} {toHexString(list(resp))}")
         elif opcode == OP_RESET:
             pass
@@ -121,7 +122,7 @@ def format_measurement(x):
     if len(pico) == 0:
         return ",".join(
             [
-                datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                probe[3],
                 probe[0],  # time diff probe
                 '-1',  # time diff pico E2E
                 '-1',  # time diff pico read command to send command to proxy
@@ -132,7 +133,7 @@ def format_measurement(x):
         )
     return ",".join(
         [
-            datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            probe[3],
             probe[0],  # time diff probe
             str(pico[0]),  # time diff pico E2E
             str(pico[1]),  # time diff pico read command to send command to proxy
@@ -190,8 +191,8 @@ def main():
                 format_measurement,
                 zip_longest(
                     (
-                        (str(a), '"' + str(b) + '"', '"' + str(c) + '"')
-                        for (a, b, c) in probe_measurements
+                        (str(a), '"' + str(b) + '"', '"' + str(c) + '"', str(d))
+                        for (a, b, c, d) in probe_measurements
                     ),
                     pico_measurements,
                     fillvalue="",
