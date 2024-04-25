@@ -7,7 +7,6 @@ SIM Modem Script ... Runs on our measurement nodes in controlled environment on 
 import hashlib
 import serial, ssl, socket, struct
 import time
-import base64
 from datetime import datetime
 import logging
 from io import TextIOWrapper
@@ -48,7 +47,7 @@ def wait_for_pico() -> serial.Serial:
             time.sleep(1)
 
 
-def relay_with_pico(imsi, connection: ssl.SSLSocket, delay_relay=False):
+def relay_with_pico(imsi, connection: ssl.SSLSocket, pico_mode:int, delay_relay=False):
     # TODO Consider outer while loop
     connection.send(struct.pack("!Q", imsi))
     atr = None
@@ -66,9 +65,15 @@ def relay_with_pico(imsi, connection: ssl.SSLSocket, delay_relay=False):
     OP_SENDATR = 0x03
     OP_MEASUREMENT = 0x04
     OP_REQUEST_STATE = 0x05
+    OP_SET_UARTMODE = 0x06
+
 
     buf = struct.pack("=BI", OP_REQUEST_STATE, 0)
     s.write(buf)
+
+    buf = struct.pack("=BI", OP_SET_UARTMODE, 1)
+    s.write(buf)
+    s.write(pico_mode.to_bytes(1, 'big'))
 
     while LOOP:
         header = s.read(5)
@@ -110,6 +115,10 @@ def relay_with_pico(imsi, connection: ssl.SSLSocket, delay_relay=False):
                 buf = struct.pack("=BI", OP_SENDATR, len(atr))
                 s.write(buf)
                 s.write(atr)
+
+                buf = struct.pack("=BI", OP_SET_UARTMODE, 1)
+                s.write(buf)
+                s.write(pico_mode.to_bytes(1, 'big'))
         elif opcode == OP_MEASUREMENT:
             msg = data.decode('ascii')
             splits = msg.split(',')
@@ -174,6 +183,7 @@ def main():
         imsi = abs(int(hashlib.md5(canonical_name.encode()).hexdigest(), 16)) % (2 ** 64)
     else:
         imsi = parser.get_imsi()
+    pm = 1 if parser.get_pico_mode() == 'async' else  0
 
     logger.info(f"requesting {imsi}")
     socket_connection = tls_ctx.wrap_socket(
@@ -183,7 +193,7 @@ def main():
 
     while LOOP:
         pico_measurements, probe_measurements = relay_with_pico(
-            imsi, socket_connection, delay_relay=False
+            imsi, socket_connection, pm, delay_relay=False
         )
         measurements = reduce(
             lambda x, y: x + "\n" + y,

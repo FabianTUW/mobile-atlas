@@ -140,6 +140,9 @@ class TestParser():
     def get_reader_name(self):
         return self.test_config.get('reader_name', None)
 
+    def get_pico_mode(self):
+        return self.test_config.get('pico_mode', 'sync')
+
     def get_test_name(self):
         # at first get it from cmdline (higher priority), otherwise get it from config
         return self.test_args.testname or self.test_config.get('test_name', TestParser.DEFAULT_TEST_NAME)

@@ -30,6 +30,8 @@ class ProbeParser(TestParser):
                             help='SIM server name used in certificate verification. (defaults to the value of --host)')
         self.parser.add_argument('--reader', required=False, action='store_true',
                             help="Select a smartcard based on its 'reader-name'")
+        self.parser.add_argument('--pico-mode', required=False, choices=['sync', 'async'], default='sync',
+                            help="Select a pico should use a predefined clock (async) or adjust to the readers clock (sync)")
 
         subparsers = self.parser.add_subparsers(title='subcommands', required=True, dest='subcommand')
         server_parser = subparsers.add_parser('server')
@@ -85,6 +87,9 @@ class ProbeParser(TestParser):
     
     def get_use_reader(self):
         return self.test_args.reader
+
+    def get_pico_mode(self):
+        return self.test_args.pico_mode
     
     def get_blacklisted_modules(self):
         return self.test_config.get('module_blacklist', [])
