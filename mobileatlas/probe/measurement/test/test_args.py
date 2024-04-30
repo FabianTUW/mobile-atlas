@@ -141,7 +141,10 @@ class TestParser():
         return self.test_config.get('reader_name', None)
 
     def get_pico_mode(self):
-        return self.test_config.get('pico_mode', 'sync')
+        return self.test_config.get('pico_async_mode', -1)
+    
+    def get_pico_loglevel(self):
+        return self.test_config.get('pico_loglevel', 'DEBUG')
 
     def get_test_name(self):
         # at first get it from cmdline (higher priority), otherwise get it from config
